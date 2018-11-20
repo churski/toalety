@@ -1,5 +1,6 @@
 import argparse
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
+import gpioMock as GPIO
 import time
 import signal
 import sys
@@ -16,10 +17,9 @@ outputFileName = "motion.state"
 # Arguments
 
 parser = argparse.ArgumentParser(description=
-  '''
+'''
 Driver for motion detector, LED indicator and writer to file.
-Detector signal must be connected to BCM pin %d and output to pin %d.
-State is written to file "%s"''' % (inputPin, outputPin, outputFileName)
+'''
 )
 parser.add_argument('-t', type=int, default=10, help='seconds, how long LED will light, at least %d' % MIN_TIME)
 parser.add_argument('-d', type=float, default=0.3, help='seconds, delay between updates of the state')
@@ -37,10 +37,10 @@ if args.d < 0.1:
 # Prepare handling  Ctrl+C
 
 def signal_handler(sig, frame):
-        print "\nCleaning up GPIO"
+    print "\nCleaning up GPIO"
     GPIO.cleanup()
     print "Done"
-        sys.exit(0)
+    sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -111,8 +111,8 @@ femaleSensor = SensorData(
 
 while 1:
     change = false
-    change = change OR updateSensor(maleSensor)
-    change = change OR updateSensor(femaleSensor)
+    change = change or updateSensor(maleSensor)
+    change = change or updateSensor(femaleSensor)
     if change:
         updateFile([maleSensor, femaleSensor])
     time.sleep(0.3)
