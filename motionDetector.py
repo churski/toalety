@@ -7,8 +7,10 @@ import sys
 SIGNAL_DURATION = 4
 MIN_TIME = 8
 
-inputPin = 15
-outputPin = 16
+signalPinMale = 15
+diodePinMale = 16
+signalPinFemale = 23
+diodePinFemale = 12
 outputFileName = "motion.state"
 
 # Arguments
@@ -26,18 +28,18 @@ parser.add_argument('-p', action='store_true', help='Print to console state chan
 args = parser.parse_args()
 
 if args.t < MIN_TIME:
-	print "Light up time must not be shorter than 8 seconds."
-	exit(1)
+    print "Light up time must not be shorter than 8 seconds."
+    exit(1)
 if args.d < 0.1:
-	print "Delay too small"
-	exit(2)
+    print "Delay too small"
+    exit(2)
 
 # Prepare handling  Ctrl+C
 
 def signal_handler(sig, frame):
         print "\nCleaning up GPIO"
-	GPIO.cleanup()
-	print "Done"
+    GPIO.cleanup()
+    print "Done"
         sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -59,30 +61,58 @@ sinceOff = 0
 delayTime = args.d
 updateDelay = delay - SIGNAL_DURATION
 
-def updateFile():
-	global trueState
-	file = open(outputFileName, "w")
-	file.write("%d" % trueState)
-	file.close()
+class SensorData:
+    def __init__(self, signalPin, diodePin):
+            self.trueState = 0
+            self.sinceOff = 0
+            self.delayTime = args.d
+            self.updateDelay = delay - SIGNAL_DURATION
+            self.signalPin = signalPin
+            self.diodePin = diodePin
+    
+
+def updateFile(sensors):
+    global trueState
+    file = open(outputFileName, "w")
+    for sensor in sensors:
+        file.write("%d\n" % sensor.trueState)
+    file.close()
+
+def updateState(sensor):
+    change = false
+    state = GPIO.input(sensor.signalPin)
+    if not state:
+        if sensor.trueState:
+            if (sensor.sinceOff >= sensor.updateDelay):
+                sensor.trueState = 0
+                if args.p:
+                    print "Off"
+                GPIO.output(sensor.diodePin, GPIO.LOW)
+                change = true
+            else:
+                sensor.sinceOff += delayTime
+    elif not sensor.trueState:
+        GPIO.output(sensor.diodePin, GPIO.HIGH)
+        sensor.sinceOff = 0
+        if args.p:
+            print "On"
+        sensor.trueState = 1
+        change = true
+    return change
+
+maleSensor = SensorData(
+    signalPinMale,
+    diodePinMale
+)
+femaleSensor = SensorData(
+    signalPinFemale,
+    diodePinFemale
+)
 
 while 1:
-	state = GPIO.input(inputPin)
-	if not state:
-		if trueState:
-			if (sinceOff >= updateDelay):
-				trueState = 0
-				if args.p:
-					print "Off"
-				GPIO.output(outputPin, GPIO.LOW)
-				updateFile()
-			else:
-				sinceOff += delayTime
-	elif not trueState:
-		GPIO.output(outputPin, GPIO.HIGH)
-		sinceOff = 0
-		if args.p:
-			print "On"
-		trueState = 1
-		updateFile()
-	time.sleep(0.3)
-
+    change = false
+    change = change OR updateSensor(maleSensor)
+    change = change OR updateSensor(femaleSensor)
+    if change:
+        updateFile([maleSensor, femaleSensor])
+    time.sleep(0.3)
